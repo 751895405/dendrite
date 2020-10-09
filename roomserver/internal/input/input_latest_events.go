@@ -150,6 +150,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		},
 	)
 
+	var updates []api.OutputEvent
 	if changed {
 		// Now that we know what the latest events are, it's time to get the
 		// latest state.
@@ -159,8 +160,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 		// If we need to generate any output events then here's where we do it.
 		// TODO: Move this!
-		updates, err := u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added)
-		if err != nil {
+		if updates, err = u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added); err != nil {
 			return fmt.Errorf("u.api.updateMemberships: %w", err)
 		}
 	}
@@ -266,8 +266,15 @@ func (u *latestEventsUpdater) calculateLatest(
 ) (changed bool) {
 	var newLatest []types.StateAtEventAndReference
 	defer func() {
-		if oldLatest != newLatest {
+		if len(oldLatest) != len(newLatest) {
 			changed = true
+			return
+		}
+		for i := range newLatest {
+			if oldLatest[i].EventID != newLatest[i].EventID {
+				changed = true
+				return
+			}
 		}
 	}()
 
@@ -308,6 +315,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	}
 
 	u.latest = newLatest
+	return
 }
 
 func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error) {
