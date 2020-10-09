@@ -142,7 +142,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 	// Work out what the latest events are. This will include the new
 	// event if it is not already referenced.
-	u.calculateLatest(
+	changed := u.calculateLatest(
 		oldLatest,
 		types.StateAtEventAndReference{
 			EventReference: u.event.EventReference(),
@@ -150,17 +150,19 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		},
 	)
 
-	// Now that we know what the latest events are, it's time to get the
-	// latest state.
-	if err = u.latestState(); err != nil {
-		return fmt.Errorf("u.latestState: %w", err)
-	}
+	if changed {
+		// Now that we know what the latest events are, it's time to get the
+		// latest state.
+		if err = u.latestState(); err != nil {
+			return fmt.Errorf("u.latestState: %w", err)
+		}
 
-	// If we need to generate any output events then here's where we do it.
-	// TODO: Move this!
-	updates, err := u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added)
-	if err != nil {
-		return fmt.Errorf("u.api.updateMemberships: %w", err)
+		// If we need to generate any output events then here's where we do it.
+		// TODO: Move this!
+		updates, err := u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added)
+		if err != nil {
+			return fmt.Errorf("u.api.updateMemberships: %w", err)
+		}
 	}
 
 	var update *api.OutputEvent
@@ -261,8 +263,13 @@ func (u *latestEventsUpdater) latestState() error {
 func (u *latestEventsUpdater) calculateLatest(
 	oldLatest []types.StateAtEventAndReference,
 	newEvent types.StateAtEventAndReference,
-) {
+) (changed bool) {
 	var newLatest []types.StateAtEventAndReference
+	defer func() {
+		if oldLatest != newLatest {
+			changed = true
+		}
+	}()
 
 	// First of all, let's see if any of the existing forward extremities
 	// now have entries in the previous events table. If they do then we
