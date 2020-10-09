@@ -266,10 +266,15 @@ func (u *latestEventsUpdater) calculateLatest(
 ) (changed bool) {
 	var newLatest []types.StateAtEventAndReference
 	defer func() {
+		// Work out whether we actually produced a set of forward extremities
+		// that's different to the previous set. If we did then the caller
+		// will know whether or not to generate a new state snapshot.
 		if len(oldLatest) != len(newLatest) {
 			changed = true
 			return
 		}
+		// This loop works because, in the next section, we copy from the
+		// oldEvents slice in order.
 		for i := range newLatest {
 			if oldLatest[i].EventID != newLatest[i].EventID {
 				changed = true
